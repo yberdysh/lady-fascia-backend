@@ -40,6 +40,7 @@
 const express = require('express');
 const nodemailer = require('nodemailer');
 const bodyParser = require('body-parser');
+const { google } = require('googleapis');
 const cors = require('cors');
 require('dotenv').config(); // Load environment variables
 
@@ -50,6 +51,13 @@ const PORT = process.env.PORT || 5050;
 app.use(cors()); // Allows frontend to communicate with backend
 app.use(bodyParser.json()); // Parses incoming JSON data
 
+const oAuth2Client = new google.auth.OAuth2(
+  CLIENT_ID,
+  CLIENT_SECRET,
+  REDIRECT_URI
+);
+oAuth2Client.setCredentials({ refresh_token: REFRESH_TOKEN });
+
 // Email sending route
 app.post('/send-email', async (req, res) => {
   const { name, email, message } = req.body;
@@ -58,14 +66,22 @@ app.post('/send-email', async (req, res) => {
     return res.status(400).json({ error: 'All fields are required' });
   }
 
-  // Set up Nodemailer transporter
-  const transporter = nodemailer.createTransport({
-    service: 'gmail', // You can change this if using another email provider
-    auth: {
-      user: process.env.EMAIL_USER, // Your email from .env
-      pass: process.env.EMAIL_PASS, // Your email password from .env
-    },
-  });
+  try {
+    const accessToken = await oAuth2Client.getAccessToken();
+
+      // Set up Nodemailer transporter
+    const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: {
+            type: "OAuth2",
+            user: process.env.EMAIL_USER,
+            clientId: process.env.CLIENT_ID,
+            clientSecret: process.env.CLIENT_SECRET,
+            refreshToken: process.env.REFRESH_TOKEN,
+            accessToken: accessToken.token,
+        },
+    });
+
 
   const mailOptions = {
     from: email,
